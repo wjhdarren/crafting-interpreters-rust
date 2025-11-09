@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::io::{self, Write};
 use std::{fs, process};
 
+#[derive(Debug, Clone)]
 pub struct Lox {
     pub had_error: bool,
 }
