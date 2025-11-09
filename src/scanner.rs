@@ -91,7 +91,13 @@ impl Scanner {
             ' ' | '\r' | '\t' => (),
             '\n' => self.line += 1,
 
-            _ => self.session.error(self.line, "Unexpected character."),
+            _ => {
+                if c.is_ascii_digit() {
+                    self.number();
+                } else {
+                    self.session.error(self.line, "Unexpected character.")
+                }
+            }
         }
     }
 
@@ -109,10 +115,11 @@ impl Scanner {
 
     /// Hepler method of `scan_token` function. Look at current unconsumed character without consuming.
     fn peek(&self) -> char {
-        if self.is_at_end() {
-            return '\0';
-        }
-        self.source.chars().nth(self.current).unwrap()
+        self.source.chars().nth(self.current + 1).unwrap_or('\0')
+    }
+
+    fn peak_next(&self) -> char {
+        self.source.chars().nth(self.current + 1).unwrap_or('\0')
     }
 
     fn string(&mut self) {
@@ -131,6 +138,22 @@ impl Scanner {
 
         let value = &self.source[self.start + 1..self.current - 1];
         self.add_token(TokenType::String, Literal::String(value.to_string()));
+    }
+
+    fn number(&mut self) {
+        while self.peek().is_ascii_digit() {
+            self.current += 1;
+        }
+
+        if self.peek() == '.' && self.peak_next().is_ascii_digit() {
+            self.current += 1;
+            while self.peek().is_ascii_digit() {
+                self.current += 1;
+            }
+        }
+
+        let number: f64 = self.source[self.start..self.current].parse().unwrap();
+        self.add_token(TokenType::Number, Literal::Number(number));
     }
 
     pub fn scan_tokens(&mut self) {
