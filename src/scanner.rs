@@ -33,9 +33,14 @@ impl Scanner {
             .push(Token::new(token_type, text.to_string(), literal, self.line));
     }
 
-    fn scan_token(&mut self) {
+    fn advance(&mut self) -> char {
         let c = self.source.chars().nth(self.current).unwrap();
         self.current += 1;
+        c
+    }
+
+    fn scan_token(&mut self) {
+        let c = self.advance();
         match c {
             '(' => self.add_token(TokenType::LeftParen, Nil),
             ')' => self.add_token(TokenType::RightParen, Nil),
@@ -82,6 +87,7 @@ impl Scanner {
                     self.add_token(TokenType::Slash, Nil)
                 }
             }
+            '"' => self.string(),
             ' ' | '\r' | '\t' => (),
             '\n' => self.line += 1,
 
@@ -101,12 +107,30 @@ impl Scanner {
         true
     }
 
-    /// Hepler method of `scan_token` function.
+    /// Hepler method of `scan_token` function. Look at current unconsumed character without consuming.
     fn peek(&self) -> char {
         if self.is_at_end() {
             return '\0';
         }
         self.source.chars().nth(self.current).unwrap()
+    }
+
+    fn string(&mut self) {
+        while self.peek() != '"' && self.is_at_end() {
+            if self.peek() == '\n' {
+                self.line += 1;
+            }
+            self.current += 1;
+        }
+        if self.is_at_end() {
+            self.session.error(self.line, "Unterminated string.");
+            return;
+        }
+
+        self.current += 1;
+
+        let value = &self.source[self.start + 1..self.current - 1];
+        self.add_token(TokenType::String, Literal::String(value.to_string()));
     }
 
     pub fn scan_tokens(&mut self) {
