@@ -9,7 +9,6 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
-    session: Lox,
     keywords: HashMap<String, TokenType>,
 }
 
@@ -21,7 +20,6 @@ impl Scanner {
             start: 0,
             current: 0,
             line: 1,
-            session: Lox::new(),
             keywords: HashMap::from([
                 ("and".to_string(), TokenType::And),
                 ("class".to_string(), TokenType::Class),
@@ -59,7 +57,7 @@ impl Scanner {
         c
     }
 
-    fn scan_token(&mut self) {
+    fn scan_token(&mut self, lox: &mut Lox) {
         let c = self.advance();
         match c {
             // single symbols
@@ -92,7 +90,7 @@ impl Scanner {
                 if self.match_char('=') {
                     self.add_token(TokenType::LessEqual, Nil)
                 } else {
-                    self.add_token(TokenType::Equal, Nil)
+                    self.add_token(TokenType::Less, Nil)
                 }
             }
             '>' => {
@@ -103,15 +101,18 @@ impl Scanner {
                 }
             }
             '/' => {
-                if self.peek() != '\n' && !self.is_at_end() {
-                    self.current += 1
+                if self.match_char('/') {
+                    // A comment goes until the end of the line
+                    while self.peek() != '\n' && !self.is_at_end() {
+                        self.advance();
+                    }
                 } else {
                     self.add_token(TokenType::Slash, Nil)
                 }
             }
 
             // string
-            '"' => self.string(),
+            '"' => self.string(lox),
 
             // empty space
             ' ' | '\r' | '\t' => (),
@@ -121,10 +122,10 @@ impl Scanner {
                 // number
                 if c.is_ascii_digit() {
                     self.number();
-                } else if c.is_ascii_alphabetic() {
+                } else if c.is_ascii_alphabetic() || c == '_' {
                     self.identifier();
                 } else {
-                    self.session.error(self.line, "Unexpected character.")
+                    lox.error(self.line, "Unexpected character.")
                 }
             }
         }
@@ -144,26 +145,27 @@ impl Scanner {
 
     /// Hepler method of `scan_token` function. Look at current unconsumed character without consuming.
     fn peek(&self) -> char {
-        self.source.chars().nth(self.current + 1).unwrap_or('\0')
+        self.source.chars().nth(self.current).unwrap_or('\0')
     }
 
     fn peak_next(&self) -> char {
         self.source.chars().nth(self.current + 1).unwrap_or('\0')
     }
 
-    fn string(&mut self) {
-        while self.peek() != '"' && self.is_at_end() {
+    fn string(&mut self, lox: &mut Lox) {
+        while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
                 self.line += 1;
             }
-            self.current += 1;
+            self.advance();
         }
         if self.is_at_end() {
-            self.session.error(self.line, "Unterminated string.");
+            lox.error(self.line, "Unterminated string.");
             return;
         }
 
-        self.current += 1;
+        // Consume closing "
+        self.advance();
 
         let value = &self.source[self.start + 1..self.current - 1];
         self.add_token(TokenType::String, Literal::String(value.to_string()));
@@ -171,13 +173,14 @@ impl Scanner {
 
     fn number(&mut self) {
         while self.peek().is_ascii_digit() {
-            self.current += 1;
+            self.advance();
         }
 
         if self.peek() == '.' && self.peak_next().is_ascii_digit() {
-            self.current += 1;
+            // Consume the '.'
+            self.advance();
             while self.peek().is_ascii_digit() {
-                self.current += 1;
+                self.advance();
             }
         }
 
@@ -186,20 +189,22 @@ impl Scanner {
     }
 
     fn identifier(&mut self) {
-        while self.peek().is_alphanumeric() {
-            self.current += 1;
+        while self.peek().is_alphanumeric() || self.peek() == '_' {
+            self.advance();
         }
         let text = String::from(&self.source[self.start..self.current]);
-        if let Some(key_type) = self.keywords.get(&text) {
-            self.add_token(*key_type, Nil);
-        }
-        self.add_token(TokenType::Identifier, Nil);
+        let token_type = self
+            .keywords
+            .get(&text)
+            .copied()
+            .unwrap_or(TokenType::Identifier);
+        self.add_token(token_type, Nil);
     }
 
-    pub fn scan_tokens(&mut self) {
+    pub fn scan_tokens(&mut self, lox: &mut Lox) -> Vec<Token> {
         while !self.is_at_end() {
             self.start = self.current;
-            self.scan_token();
+            self.scan_token(lox);
         }
         self.tokens.push(Token::new(
             TokenType::Eof,
@@ -207,5 +212,6 @@ impl Scanner {
             Literal::Nil,
             self.line,
         ));
+        self.tokens.clone()
     }
 }

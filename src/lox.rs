@@ -1,3 +1,4 @@
+use crate::scanner::Scanner;
 use anyhow::Result;
 use std::io::{self, Write};
 use std::{fs, process};
@@ -50,6 +51,12 @@ impl Lox {
     }
 
     pub fn run_source(&mut self, source: String) {
-        println!("{source}");
+        let mut scanner = Scanner::new(source);
+        let tokens = scanner.scan_tokens(self);
+
+        // For now, just print the tokens
+        for token in tokens {
+            println!("{:?}", token);
+        }
     }
 }
