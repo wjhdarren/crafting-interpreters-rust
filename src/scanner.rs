@@ -1,6 +1,7 @@
 use crate::lox::Lox;
 use crate::token::Literal::Nil;
 use crate::token::{Literal, Token, TokenType};
+use std::collections::HashMap;
 
 pub struct Scanner {
     source: String,
@@ -9,6 +10,7 @@ pub struct Scanner {
     current: usize,
     line: usize,
     session: Lox,
+    keywords: HashMap<String, TokenType>,
 }
 
 impl Scanner {
@@ -20,6 +22,24 @@ impl Scanner {
             current: 0,
             line: 1,
             session: Lox::new(),
+            keywords: HashMap::from([
+                ("and".to_string(), TokenType::And),
+                ("class".to_string(), TokenType::Class),
+                ("else".to_string(), TokenType::Else),
+                ("false".to_string(), TokenType::False),
+                ("for".to_string(), TokenType::For),
+                ("fun".to_string(), TokenType::Fun),
+                ("if".to_string(), TokenType::If),
+                ("nil".to_string(), TokenType::Nil),
+                ("or".to_string(), TokenType::Or),
+                ("print".to_string(), TokenType::Print),
+                ("return".to_string(), TokenType::Return),
+                ("super".to_string(), TokenType::Super),
+                ("this".to_string(), TokenType::This),
+                ("true".to_string(), TokenType::True),
+                ("var".to_string(), TokenType::Var),
+                ("while".to_string(), TokenType::While),
+            ]),
         }
     }
 
@@ -42,6 +62,7 @@ impl Scanner {
     fn scan_token(&mut self) {
         let c = self.advance();
         match c {
+            // single symbols
             '(' => self.add_token(TokenType::LeftParen, Nil),
             ')' => self.add_token(TokenType::RightParen, Nil),
             '{' => self.add_token(TokenType::LeftBrace, Nil),
@@ -52,6 +73,7 @@ impl Scanner {
             '+' => self.add_token(TokenType::Plus, Nil),
             ';' => self.add_token(TokenType::Semicolon, Nil),
             '*' => self.add_token(TokenType::Star, Nil),
+            // multiple symbols
             '!' => {
                 if self.match_char('=') {
                     self.add_token(TokenType::BangEqual, Nil)
@@ -87,13 +109,20 @@ impl Scanner {
                     self.add_token(TokenType::Slash, Nil)
                 }
             }
+
+            // string
             '"' => self.string(),
+
+            // empty space
             ' ' | '\r' | '\t' => (),
             '\n' => self.line += 1,
 
             _ => {
+                // number
                 if c.is_ascii_digit() {
                     self.number();
+                } else if c.is_ascii_alphabetic() {
+                    self.identifier();
                 } else {
                     self.session.error(self.line, "Unexpected character.")
                 }
@@ -154,6 +183,17 @@ impl Scanner {
 
         let number: f64 = self.source[self.start..self.current].parse().unwrap();
         self.add_token(TokenType::Number, Literal::Number(number));
+    }
+
+    fn identifier(&mut self) {
+        while self.peek().is_alphanumeric() {
+            self.current += 1;
+        }
+        let text = String::from(&self.source[self.start..self.current]);
+        if let Some(key_type) = self.keywords.get(&text) {
+            self.add_token(*key_type, Nil);
+        }
+        self.add_token(TokenType::Identifier, Nil);
     }
 
     pub fn scan_tokens(&mut self) {
