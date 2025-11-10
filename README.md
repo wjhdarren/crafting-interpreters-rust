@@ -1,3 +1,3 @@
-# Crafting Intepreters
+# Crafting Interpreters
 
-My implementation of [Crafting Intepreters](https://craftinginterpreters.com/) in rust. 
+My implementation of [Crafting Interpreters](https://craftinginterpreters.com/) in rust. 
